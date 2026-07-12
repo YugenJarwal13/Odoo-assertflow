@@ -6,8 +6,8 @@ AssetFlow is a modern asset management application designed to help organization
 
 The project is structured as a monorepo with separate frontend and backend directories:
 
-- `/frontend`: The web client built using **React, Vite, and Tailwind CSS**.
-- `/backend`: The REST API server built using **Node.js, Express, and Prisma ORM**.
+- `/frontend`: The web client built using **React (v19)**, **Vite**, and **Tailwind CSS (v4)**. State management and data fetching are handled by **Zustand** and **TanStack Query**. UI components are built using **shadcn/ui** and **lucide-react**, with charts by **Recharts**.
+- `/backend`: The REST API server built using **Node.js**, **Express**, and **Prisma ORM**. Validation is handled via **Zod**, and authentication uses **JWT** (JSON Web Tokens) with **bcrypt** for password hashing. Data is stored in a **PostgreSQL** database.
 
 ## Prerequisites
 
@@ -86,7 +86,9 @@ The `Admin` account has access to the **Organisation Setup** page where you can 
 
 ## Features Overview
 
-- **Dashboard**: Centralized KPIs for assets, active employees, and overdue returns, alongside recent activity logs and quick actions.
-- **Organization Management**: Complete CRUD interface for defining Departments, custom Asset Categories, and managing Employees with Role-Based Access Control (RBAC).
-- **Notifications**: Real-time mockable updates for system activities such as role changes.
-- **Role-Based Access**: Specialized views and restricted quick actions ensuring that data security is maintained across Admins, Asset Managers, Department Heads, and Employees.
+- **Authentication & Security**: Secure signup and login flows using JWT and bcrypt. Role-based middleware ensures authorized access.
+- **Dashboard**: Centralized KPIs for assets, active employees, and overdue returns, alongside recent activity logs and quick actions powered by Recharts for data visualization.
+- **Organization Management**: Complete CRUD interface for defining Departments, custom Asset Categories, and managing Employees. Allows promoting users to different roles.
+- **Activity Logs**: Comprehensive audit trails for system actions, displaying exactly who did what and when.
+- **Notifications**: Real-time mockable updates for system activities such as role changes and organizational updates.
+- **Role-Based Access Control (RBAC)**: Specialized views and restricted quick actions ensuring that data security is maintained across Admins, Asset Managers, Department Heads, and Employees.
