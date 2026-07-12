@@ -1,0 +1,229 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ASSET_MANAGER
+  DEPARTMENT_HEAD
+  EMPLOYEE
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ALLOCATED
+  RESERVED
+  UNDER_MAINTENANCE
+  LOST
+  RETIRED
+  DISPOSED
+}
+
+enum BookingStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  TECHNICIAN_ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum TransferStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum AuditItemResult {
+  PENDING
+  VERIFIED
+  MISSING
+  DAMAGED
+}
+
+model User {
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  passwordHash  String
+  role          Role         @default(EMPLOYEE)
+  departmentId  String?
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  status        String       @default("ACTIVE") // ACTIVE / INACTIVE
+  createdAt     DateTime     @default(now())
+
+  allocationsHeld   Allocation[]        @relation("HeldBy")
+  bookingsMade      Booking[]
+  maintenanceRaised MaintenanceRequest[]
+  auditAssignments  AuditAssignment[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  name      String
+  headId    String?
+  parentId  String?
+  parent    Department? @relation("DeptHierarchy", fields: [parentId], references: [id])
+  children  Department[] @relation("DeptHierarchy")
+  status    String    @default("ACTIVE")
+  employees User[]
+  assets    Asset[]
+}
+
+model AssetCategory {
+  id     String  @id @default(cuid())
+  name   String
+  fields Json?   // e.g. { "warrantyPeriodMonths": true }
+  assets Asset[]
+}
+
+model Asset {
+  id               String        @id @default(cuid())
+  assetTag         String        @unique // AF-0001, auto-generated
+  name             String
+  categoryId       String
+  category         AssetCategory @relation(fields: [categoryId], references: [id])
+  serialNumber     String?
+  acquisitionDate  DateTime?
+  acquisitionCost  Float?
+  condition        String?
+  location         String?
+  photoUrl         String?
+  isBookable       Boolean       @default(false)
+  status           AssetStatus   @default(AVAILABLE)
+  departmentId     String?
+  department       Department?   @relation(fields: [departmentId], references: [id])
+  qrCodeUrl        String?
+  createdAt        DateTime      @default(now())
+
+  allocations   Allocation[]
+  transfers     Transfer[]
+  bookings      Booking[]
+  maintenance   MaintenanceRequest[]
+  auditItems    AuditItem[]
+}
+
+model Allocation {
+  id                 String    @id @default(cuid())
+  assetId            String
+  asset              Asset     @relation(fields: [assetId], references: [id])
+  holderUserId       String?
+  holder             User?     @relation("HeldBy", fields: [holderUserId], references: [id])
+  holderDepartmentId String?
+  allocatedAt        DateTime  @default(now())
+  expectedReturnAt   DateTime?
+  returnedAt         DateTime?
+  conditionNoteIn    String?
+  isActive           Boolean   @default(true) // false once returned/transferred
+}
+
+model Transfer {
+  id           String         @id @default(cuid())
+  assetId      String
+  asset        Asset          @relation(fields: [assetId], references: [id])
+  fromUserId   String?
+  toUserId     String?
+  status       TransferStatus @default(REQUESTED)
+  requestedAt  DateTime       @default(now())
+  decidedAt    DateTime?
+  decidedById  String?
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  assetId    String
+  asset      Asset         @relation(fields: [assetId], references: [id])
+  bookedById String
+  bookedBy   User          @relation(fields: [bookedById], references: [id])
+  startTime  DateTime
+  endTime    DateTime
+  status     BookingStatus @default(UPCOMING)
+  createdAt  DateTime      @default(now())
+}
+
+model MaintenanceRequest {
+  id            String             @id @default(cuid())
+  assetId       String
+  asset         Asset              @relation(fields: [assetId], references: [id])
+  raisedById    String
+  raisedBy      User               @relation(fields: [raisedById], references: [id])
+  issue         String
+  priority      String             @default("MEDIUM")
+  photoUrl      String?
+  status        MaintenanceStatus  @default(PENDING)
+  technicianName String?
+  createdAt     DateTime           @default(now())
+  resolvedAt    DateTime?
+}
+
+model AuditCycle {
+  id          String       @id @default(cuid())
+  scopeDept   String?
+  scopeLoc    String?
+  startDate   DateTime
+  endDate     DateTime
+  status      String       @default("OPEN") // OPEN / CLOSED
+  assignments AuditAssignment[]
+  items       AuditItem[]
+}
+
+model AuditAssignment {
+  id           String     @id @default(cuid())
+  auditCycleId String
+  auditCycle   AuditCycle @relation(fields: [auditCycleId], references: [id])
+  auditorId    String
+  auditor      User       @relation(fields: [auditorId], references: [id])
+}
+
+model AuditItem {
+  id           String          @id @default(cuid())
+  auditCycleId String
+  auditCycle   AuditCycle      @relation(fields: [auditCycleId], references: [id])
+  assetId      String
+  asset        Asset           @relation(fields: [assetId], references: [id])
+  result       AuditItemResult @default(PENDING)
+  note         String?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // ASSET_ASSIGNED, MAINTENANCE_APPROVED, BOOKING_REMINDER, ...
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+}
