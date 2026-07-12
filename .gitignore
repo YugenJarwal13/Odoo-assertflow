@@ -45,3 +45,4 @@ coverage/
 # Windows
 Thumbs.db
 desktop.ini
+/generated/prisma
