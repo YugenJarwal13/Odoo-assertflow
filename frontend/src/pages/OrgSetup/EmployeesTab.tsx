@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Pencil, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { Modal } from '@/components/ui/modal';
 

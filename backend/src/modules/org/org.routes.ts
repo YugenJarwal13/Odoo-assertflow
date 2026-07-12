@@ -38,7 +38,7 @@ router.post('/departments', requireAuth, requireRole(['ADMIN']), async (req, res
 router.patch('/departments/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
     const { name, headId, parentId, status } = req.body;
-    const dept = await orgService.updateDepartment(req.user!.id, req.params.id, {
+    const dept = await orgService.updateDepartment(req.user!.id, String(req.params.id), {
       name,
       headId,
       parentId,
@@ -84,7 +84,7 @@ router.post('/categories', requireAuth, requireRole(['ADMIN']), async (req, res)
 router.patch('/categories/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
     const { name, fields } = req.body;
-    const cat = await orgService.updateCategory(req.user!.id, req.params.id, { name, fields });
+    const cat = await orgService.updateCategory(req.user!.id, String(req.params.id), { name, fields });
     res.json({ data: cat });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to update category';
@@ -127,7 +127,7 @@ router.patch(
         res.status(400).json({ error: 'Role is required' });
         return;
       }
-      const employee = await orgService.updateEmployeeRole(req.user!.id, req.params.id, role);
+      const employee = await orgService.updateEmployeeRole(req.user!.id, String(req.params.id), role);
       res.json({ data: employee });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update role';
@@ -165,7 +165,7 @@ router.patch(
   async (req, res) => {
     try {
       const { name, role, departmentId, status } = req.body;
-      const employee = await orgService.updateEmployeeDetails(req.user!.id, req.params.id, { name, role, departmentId, status });
+      const employee = await orgService.updateEmployeeDetails(req.user!.id, String(req.params.id), { name, role, departmentId, status });
       res.json({ data: employee });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update employee';

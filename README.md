@@ -1,20 +1,35 @@
-# AssetFlow
+# AssetFlow — Enterprise Asset & Resource Management
 
-AssetFlow is a modern asset management application designed to help organizations manage their assets, employees, and departments efficiently. It includes an interactive dashboard, comprehensive organization tracking, and a powerful notification system.
+AssetFlow is a modern ERP-style platform that helps organizations track assets through their full
+lifecycle, allocate them with conflict rules, book shared resources without overlaps, route
+maintenance through approvals, and run structured audit cycles — all backed by role-based
+workflows, notifications, and a complete activity log.
 
 ## Project Structure
 
 The project is structured as a monorepo with separate frontend and backend directories:
 
-- `/frontend`: The web client built using **React (v19)**, **Vite**, and **Tailwind CSS (v4)**. State management and data fetching are handled by **Zustand** and **TanStack Query**. UI components are built using **shadcn/ui** and **lucide-react**, with charts by **Recharts**.
-- `/backend`: The REST API server built using **Node.js**, **Express**, and **Prisma ORM**. Validation is handled via **Zod**, and authentication uses **JWT** (JSON Web Tokens) with **bcrypt** for password hashing. Data is stored in a **PostgreSQL** database.
+- `/frontend`: The web client built using **React (v19)**, **Vite**, and **Tailwind CSS (v4)**. State management and data fetching are handled by **Zustand** and **TanStack Query**. UI components are built using **shadcn/ui** and **lucide-react**, with charts by **Recharts** and QR codes via **qrcode**.
+- `/backend`: The REST API server built using **Node.js**, **Express**, and **Prisma ORM**. Validation is handled via **Zod**, and authentication uses **JWT** with **bcrypt** for password hashing. Data is stored in a **PostgreSQL** database (Neon).
+
+```
+backend/src/
+  lib/          prisma client, activity logger, notifications, asset lifecycle state machine, errors
+  middleware/   JWT auth, role guard
+  modules/      auth · org · dashboard · notifications · logs · assets · bookings · maintenance · audits · reports
+```
+
+Architecture highlights:
+- **Service layer separation** — routes never touch Prisma directly (`routes → service → prisma`).
+- **State machine** (`lib/assetLifecycle.ts`) — every asset status change is validated against a single allowed-transitions table.
+- **Every write action** creates an `ActivityLog` row, and notifications are emitted as service side-effects.
+- **Conflict rules return structured HTTP 409s**: double allocation includes the current holder; booking overlap includes the conflicting slot.
 
 ## Prerequisites
 
-Make sure you have the following installed on your machine:
-- Node.js (v18 or higher recommended)
-- npm or yarn
-- PostgreSQL (if running locally) or a cloud-hosted Postgres database URL
+- Node.js (v20 or higher recommended)
+- npm
+- A PostgreSQL database URL (the team uses a shared Neon instance)
 
 ## Setup Instructions
 
@@ -25,70 +40,100 @@ Navigate to the root directory and install backend dependencies:
 npm install
 ```
 
-Set up your environment variables. Create a `.env` file in the `backend/` directory with the following variables:
+Create a `.env` file in the `backend/` directory:
 ```env
-DATABASE_URL="postgresql://username:password@localhost:5432/assetflow?schema=public"
-JWT_SECRET="your_super_secret_jwt_key_here"
+DATABASE_URL="<your PostgreSQL connection string>"
+JWT_SECRET="assetflow-hackathon-2026-shared-secret"
+PORT=3001
 ```
+> Both teammates must use the **same `JWT_SECRET`**, or tokens issued by one machine won't validate on the other.
 
-Initialize the database schema using Prisma:
+Generate the Prisma client:
 ```bash
-npx prisma db push
+cd backend && npx prisma generate && cd ..
 ```
-*(Alternatively, use `npx prisma migrate dev` if you prefer to generate migration files).*
+> The initial migration is already applied to the shared Neon DB — do **not** run `migrate dev`
+> against it. For a fresh database, run `npx prisma migrate deploy` instead.
 
-Seed the database with initial data (Admin user, departments, categories, and employees):
+Seed the database (idempotent — skips demo assets if they already exist):
 ```bash
 npm run seed
 ```
 
 ### 2. Frontend Setup
 
-Open a new terminal window, navigate to the `frontend` directory, and install its dependencies:
+Open a new terminal, navigate to the `frontend` directory, and install its dependencies:
 ```bash
 cd frontend
 npm install
 ```
 
-The frontend uses Vite and expects the backend to be running at `http://localhost:5000` by default.
-
 ## Running the Application
 
-To run the application, you will need to start both the backend and frontend development servers.
-
-**Terminal 1 (Backend):**
-From the root directory, start the Express backend server:
+**Terminal 1 (Backend):** from the repo root:
 ```bash
 npm run dev:backend
 ```
-*The backend server will run on `http://localhost:5000`.*
+*The API runs on `http://localhost:3001`.*
 
 **Terminal 2 (Frontend):**
-Navigate to the `frontend` directory and start the Vite development server:
 ```bash
 cd frontend
 npm run dev
 ```
-*The frontend server will run on `http://localhost:5173`.*
+*The UI runs on `http://localhost:5173`.*
 
-## Starting Details & Login
+## Demo Credentials
 
-Once both servers are running, open your browser and navigate to `http://localhost:5173`. 
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@assetflow.com` | `admin123` |
+| Asset Manager | `priya@assetflow.com` | `password123` |
+| Department Head | `rahul@assetflow.com` | `password123` |
+| Employee | `ananya@assetflow.com` | `password123` |
 
-The database seed script (`npm run seed`) creates several default accounts you can use to log in immediately:
+Signup always creates an **Employee** account — roles are granted only by the Admin from
+Organization → Employee Directory (no self-assigned admins).
 
-- **Admin Account**: `admin@assetflow.com` / `admin123`
-- **Asset Manager**: `priya@assetflow.com` / `password123`
-- **Department Head**: `rahul@assetflow.com` / `password123`
-- **Employee**: `ananya@assetflow.com` / `password123`
+## 2-Minute Demo Script
 
-The `Admin` account has access to the **Organisation Setup** page where you can manage departments, employees, and asset categories, as well as access the **Activity Logs** and **Reports**.
+1. **Admin** → Dashboard: six KPI cards, overdue returns panel, pending-approval strips.
+2. **Priya (Asset Manager)** → Assets: register an asset (tag auto-generates), open its detail page — lifecycle stepper + QR code.
+3. Allocate an *available* asset to Ananya. Then try allocating an *allocated* one — the system blocks it, names the current holder, and offers **Request Transfer** instead.
+4. Allocations → approve the pending transfer; open the asset's history to show the automatic trail.
+5. Bookings: Conference Room Alpha calendar; book 9:30–10:30 over an existing 9:00–10:00 slot → rejected with the conflicting slot shown; 10:00–11:00 → accepted.
+6. Maintenance: approve the pending request (asset flips to *Under Maintenance*), assign a technician, resolve (asset flips back).
+7. Audits: open the HQ Floor 2 cycle as Priya, mark an item **Missing** with a note, verify the rest, close the cycle → discrepancy report + missing asset auto-flips to **Lost**.
+8. Reports: status donut, most-used assets, booking heatmap, department summary + CSV export.
+9. Log in as **Ananya (Employee)** — a genuinely different UI: My Assets, bookings, maintenance, live notification bell.
 
 ## Features Overview
 
-- **Authentication & Security**: Secure signup and login flows using JWT and bcrypt. Role-based middleware ensures authorized access.
-- **Dashboard**: Centralized KPIs for assets, active employees, and overdue returns, alongside recent activity logs and quick actions powered by Recharts for data visualization.
-- **Organization Management**: Complete CRUD interface for defining Departments, custom Asset Categories, and managing Employees. Allows promoting users to different roles.
-- **Activity Logs**: Comprehensive audit trails for system actions, displaying exactly who did what and when.
-- **Notifications**: Real-time mockable updates for system activities such as role changes and organizational updates.
-- **Role-Based Access Control (RBAC)**: Specialized views and restricted quick actions ensuring that data security is maintained across Admins, Asset Managers, Department Heads, and Employees.
+- **Authentication & Security**: JWT + bcrypt, role-based middleware, realistic non-self-elevating signup.
+- **Dashboard**: Six KPI cards (Available, Allocated, Maintenance Today, Active Bookings, Pending Transfers, Upcoming Returns), overdue returns highlighted separately, quick actions, fleet-by-status breakdown, recent activity.
+- **Organization Management**: CRUD for Departments (with heads/hierarchy), Asset Categories (custom fields), and the Employee Directory with role promotion.
+- **Asset Registry**: Auto-generated tags (AF-0001…), search/filter by tag, serial, category, status, location; per-asset QR code, lifecycle stepper, and full allocation/transfer/maintenance history.
+- **Allocation & Transfers**: Double-allocation is blocked with the holder named and a Transfer Request offered; transfers go through approval and re-allocate with history updated automatically; returns capture condition check-in notes; overdue returns are auto-flagged.
+- **Resource Booking**: Week-calendar per resource, overlap validation (back-to-back slots allowed), cancel/reschedule, statuses auto-roll Upcoming → Ongoing → Completed.
+- **Maintenance**: Pending → Approved/Rejected → Technician Assigned → In Progress → Resolved, with the asset flipping to Under Maintenance on approval and restored on resolution.
+- **Audits**: Scoped cycles auto-pull assets, assigned auditors mark Verified/Missing/Damaged, auto-generated discrepancy report (CSV export), closing flips confirmed-missing assets to Lost.
+- **Reports & Analytics**: Utilization (most-used vs idle), maintenance frequency by category, booking heatmap (peak windows), department-wise allocation summary with CSV export.
+- **Activity Logs & Notifications**: Every write is audit-logged; notifications fire on assignments, approvals, bookings, discrepancies — with a live unread badge.
+
+## API Overview
+
+```
+POST /api/auth/signup · login          GET /api/auth/me
+GET|POST|PATCH /api/departments · /api/categories · /api/employees
+GET  /api/dashboard/kpis               GET /api/notifications · /api/activity-logs
+GET|POST /api/assets                   GET /api/assets/:id · /:id/history
+POST /api/assets/:id/allocate · /:id/transfer-request
+GET  /api/allocations                  POST /api/allocations/:id/return
+GET  /api/transfers                    PATCH /api/transfers/:id/decision
+GET|POST|PATCH /api/bookings           (PATCH = cancel/reschedule, overlap-validated)
+GET|POST /api/maintenance              PATCH /api/maintenance/:id/{decision,assign-technician,start,resolve}
+GET|POST /api/audits                   POST /api/audits/:id/{assign-auditor,close} · PATCH /:id/items/:itemId
+GET  /api/reports/{utilization,maintenance-frequency,booking-heatmap,department-summary}
+```
+
+All responses use a consistent `{ data }` / `{ error, details? }` shape.
