@@ -1,4 +1,5 @@
 import prisma from './prisma.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 
 export async function logActivity(
   userId: string,
@@ -14,7 +15,7 @@ export async function logActivity(
         action,
         entityType,
         entityId,
-        meta: meta ?? undefined,
+        meta: meta as Prisma.InputJsonValue | undefined,
       },
     });
   } catch (err) {

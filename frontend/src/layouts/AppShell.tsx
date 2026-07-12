@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { apiClient } from '@/lib/apiClient';
 import {
   LayoutDashboard,
   Building2,
@@ -15,15 +16,18 @@ import {
   X,
   LogOut,
   ChevronDown,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 const allNavItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD', 'EMPLOYEE'] },
   { to: '/org', label: 'Organization', icon: Building2, roles: ['ADMIN'] },
   { to: '/assets', label: 'Assets', icon: Package, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD'] },
+  { to: '/allocations', label: 'Allocations', icon: ArrowRightLeft, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD'] },
+  { to: '/allocations', label: 'My Assets', icon: Package, roles: ['EMPLOYEE'] },
   { to: '/bookings', label: 'Bookings', icon: CalendarDays, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD', 'EMPLOYEE'] },
   { to: '/maintenance', label: 'Maintenance', icon: Wrench, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD', 'EMPLOYEE'] },
-  { to: '/audits', label: 'Audits', icon: ClipboardCheck, roles: ['ADMIN', 'ASSET_MANAGER'] },
+  { to: '/audits', label: 'Audits', icon: ClipboardCheck, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD', 'EMPLOYEE'] },
   { to: '/reports', label: 'Reports', icon: BarChart3, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD'] },
   { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['ADMIN', 'ASSET_MANAGER', 'DEPARTMENT_HEAD', 'EMPLOYEE'] },
   { to: '/activity-log', label: 'Activity Log', icon: Activity, roles: ['ADMIN'] },
@@ -41,6 +45,24 @@ export default function AppShell() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const location = useLocation();
+
+  // Refresh the unread badge on navigation and every 30s
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUnread = () =>
+      apiClient
+        .get('/notifications')
+        .then(({ data }) => !cancelled && setUnreadCount(data.data.unreadCount ?? 0))
+        .catch(() => {});
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   const userRole = user?.role || 'EMPLOYEE';
   const navItems = allNavItems.filter((item) => item.roles.includes(userRole));
@@ -159,6 +181,11 @@ export default function AppShell() {
             }
           >
             <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </NavLink>
 
           {/* Profile dropdown */}

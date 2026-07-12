@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
 interface LogEntry {

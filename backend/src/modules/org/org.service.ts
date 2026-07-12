@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../lib/prisma.js';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { logActivity } from '../../lib/logger.js';
 import { createNotification } from '../../lib/notifications.js';
 
@@ -69,7 +70,7 @@ export async function createCategory(
   const cat = await prisma.assetCategory.create({
     data: {
       name: data.name,
-      fields: data.fields,
+      fields: data.fields as Prisma.InputJsonValue | undefined,
     },
   });
 
@@ -87,7 +88,10 @@ export async function updateCategory(
 ) {
   const cat = await prisma.assetCategory.update({
     where: { id },
-    data,
+    data: {
+      name: data.name,
+      fields: data.fields as Prisma.InputJsonValue | undefined,
+    },
   });
 
   await logActivity(userId, 'CATEGORY_UPDATED', 'AssetCategory', cat.id, {
